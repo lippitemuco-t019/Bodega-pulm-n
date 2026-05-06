@@ -375,20 +375,16 @@ const INVENTORY = {"101101533754316":{"desc":"3/4 Pantalón Mujer Verano  Droit 
 let currentMode = 'entrada';
 let currentQty = 1;
 let currentSKU = null;
-let movements = [];
+window.movements = [];   // array global — Firebase lo actualiza en tiempo real
 let filter = 'all';
 let camStream = null;
 let barcodeDetector = null;
 let scanning = false;
 
-// Load from localStorage
-try {
-  const saved = onSnapshot(...);
-  if (saved) movements = JSON.parse(saved);
-} catch(e) {}
-
+// Firebase se inicializa al final como módulo ES — save() y load son no-ops hasta que esté listo
 function save() {
-  try { addDoc(collection(db, "movimientos"), { ... })
+  // La sincronización ocurre vía Firebase Realtime Database (ver script type="module" al final)
+  if (window._fbSave) window._fbSave(window.movements);
 }
 
 // ════════════════════════════════════════════════
@@ -507,7 +503,7 @@ function registerMovement() {
     mode: currentMode,
     ts: new Date().toISOString()
   };
-  movements.unshift(mov);
+  window.movements.unshift(mov);
   save();
   updateStats();
   updateBadge();
@@ -530,7 +526,7 @@ function registerMovement() {
 // ════════════════════════════════════════════════
 function renderRecent() {
   const el = document.getElementById('recent-list');
-  const recent = movements.slice(0, 5);
+  const recent = window.movements.slice(0, 5);
   if (!recent.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">Escanea un producto para comenzar</div></div>';
     return;
@@ -541,7 +537,7 @@ function renderRecent() {
 function renderMoves() {
   const q = document.getElementById('search-moves').value.toLowerCase();
   const el = document.getElementById('moves-list');
-  let list = movements;
+  let list = window.movements;
   if (filter !== 'all') list = list.filter(m => m.mode === filter);
   if (q) list = list.filter(m => m.sku.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q));
   if (!list.length) {
@@ -572,7 +568,7 @@ function renderReport() {
   const el = document.getElementById('report-list');
   // Group by SKU
   const bysku = {};
-  for (const m of movements) {
+  for (const m of window.movements) {
     if (!bysku[m.sku]) bysku[m.sku] = { sku: m.sku, desc: m.desc, entradas: 0, salidas: 0 };
     if (m.mode === 'entrada') bysku[m.sku].entradas += m.qty;
     else bysku[m.sku].salidas += m.qty;
@@ -582,8 +578,8 @@ function renderReport() {
   rows.sort((a, b) => (b.entradas + b.salidas) - (a.entradas + a.salidas));
 
   // Update counts
-  const totalE = movements.filter(m=>m.mode==='entrada').reduce((a,m)=>a+m.qty,0);
-  const totalS = movements.filter(m=>m.mode==='salida').reduce((a,m)=>a+m.qty,0);
+  const totalE = window.movements.filter(m=>m.mode==='entrada').reduce((a,m)=>a+m.qty,0);
+  const totalS = window.movements.filter(m=>m.mode==='salida').reduce((a,m)=>a+m.qty,0);
   document.getElementById('r-entradas').textContent = totalE;
   document.getElementById('r-salidas').textContent = totalS;
   document.getElementById('r-skus').textContent = Object.keys(bysku).length;
@@ -612,18 +608,18 @@ function renderReport() {
 // STATS & BADGE
 // ════════════════════════════════════════════════
 function updateStats() {
-  const e = movements.filter(m=>m.mode==='entrada').reduce((a,m)=>a+m.qty,0);
-  const s = movements.filter(m=>m.mode==='salida').reduce((a,m)=>a+m.qty,0);
+  const e = window.movements.filter(m=>m.mode==='entrada').reduce((a,m)=>a+m.qty,0);
+  const s = window.movements.filter(m=>m.mode==='salida').reduce((a,m)=>a+m.qty,0);
   document.getElementById('s-entradas').textContent = e;
   document.getElementById('s-salidas').textContent = s;
-  document.getElementById('s-total').textContent = movements.length;
+  document.getElementById('s-total').textContent = window.movements.length;
 }
 
 function updateBadge() {
   const badge = document.getElementById('cnt-badge');
-  if (movements.length > 0) {
+  if (window.movements.length > 0) {
     badge.style.display = 'inline-flex';
-    badge.textContent = movements.length;
+    badge.textContent = window.movements.length;
   } else {
     badge.style.display = 'none';
   }
@@ -644,7 +640,7 @@ function setFilter(f) {
 // DELETE
 // ════════════════════════════════════════════════
 function deleteMovement(id) {
-  movements = movements.filter(m => m.id !== id);
+  window.movements = window.movements.filter(m => m.id !== id);
   save(); updateStats(); updateBadge(); renderMoves();
   showToast('Movimiento eliminado', 'warning');
 }
@@ -653,9 +649,9 @@ function deleteMovement(id) {
 // CLEAR ALL
 // ════════════════════════════════════════════════
 function clearAll() {
-  if (!movements.length) return;
-  if (confirm(`¿Eliminar los ${movements.length} movimientos registrados?`)) {
-    movements = [];
+  if (!window.movements.length) return;
+  if (confirm(`¿Eliminar los ${window.movements.length} movimientos registrados?`)) {
+    window.movements = [];
     save(); updateStats(); updateBadge(); renderRecent(); renderMoves(); renderReport();
     showToast('Registros limpiados', 'warning');
   }
@@ -665,9 +661,9 @@ function clearAll() {
 // EXPORT CSV
 // ════════════════════════════════════════════════
 function exportCSV() {
-  if (!movements.length) { showToast('Sin datos para exportar', 'error'); return; }
+  if (!window.movements.length) { showToast('Sin datos para exportar', 'error'); return; }
   const header = 'Tipo,SKU,Descripcion,Cantidad,Fecha\n';
-  const rows = movements.map(m =>
+  const rows = window.movements.map(m =>
     `${m.mode},"${m.sku}","${(m.desc||'').replace(/"/g,'""')}",${m.qty},${m.ts}`
   ).join('\n');
   const blob = new Blob([header + rows], {type:'text/csv;charset=utf-8;'});
@@ -783,12 +779,9 @@ function escHtml(s) {
 // Auto-focus on scan tab
 document.getElementById('sku-input').focus();
 <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-  // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBX85J6hCO3a33pFi1s6WXzOk7Jnk7z86k",
   authDomain: "bodega-pulmon-ddde9.firebaseapp.com",
@@ -799,8 +792,54 @@ const firebaseConfig = {
   appId: "1:690737347793:web:642383399348a20155d9f0"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+const movRef = ref(db, 'movements');
+
+// ── ESCUCHAR CAMBIOS EN TIEMPO REAL ──────────────────────────────
+// Se dispara en todos los dispositivos al instante cuando cambia la DB
+onValue(movRef, (snapshot) => {
+  const data = snapshot.val();
+  // Actualizar el array global y re-renderizar todo
+  window.movements = data ? Object.values(data) : [];
+  // Ordenar por timestamp descendente (más reciente primero)
+  window.movements.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  renderRecent();
+  renderMoves();
+  renderReport();
+  updateStats();
+  updateBadge();
+});
+
+// ── GUARDAR EN FIREBASE ───────────────────────────────────────────
+// Convierte el array a objeto { id: movimiento } para Firebase
+window._fbSave = function(movs) {
+  const obj = {};
+  for (const m of movs) obj[m.id] = m;
+  set(movRef, obj).catch(err => {
+    console.error('Firebase write error:', err);
+    showToast('Error al sincronizar', 'error');
+  });
+};
+
+// Indicador de conexión en tiempo real
+const connRef = ref(db, '.info/connected');
+onValue(connRef, (snap) => {
+  const badge = document.getElementById('badge-mode');
+  if (snap.val() === true) {
+    // Conectado — no hacemos nada, el badge muestra el modo normal
+    document.getElementById('conn-indicator') && document.getElementById('conn-indicator').remove();
+  } else {
+    // Sin conexión — mostrar aviso
+    if (!document.getElementById('conn-indicator')) {
+      const el = document.createElement('span');
+      el.id = 'conn-indicator';
+      el.style.cssText = 'font-size:10px;color:#ffb020;margin-left:8px;';
+      el.textContent = '⚠ sin red';
+      badge.parentNode.insertBefore(el, badge.nextSibling);
+    }
+  }
+});
 </script>
 </body>
 </html>
