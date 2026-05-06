@@ -383,12 +383,12 @@ let scanning = false;
 
 // Load from localStorage
 try {
-  const saved = localStorage.getItem('bodega_movements');
+  const saved = onSnapshot(...);
   if (saved) movements = JSON.parse(saved);
 } catch(e) {}
 
 function save() {
-  try { localStorage.setItem('bodega_movements', JSON.stringify(movements)); } catch(e) {}
+  try { addDoc(collection(db, "movimientos"), { ... })
 }
 
 // ════════════════════════════════════════════════
@@ -782,6 +782,25 @@ function escHtml(s) {
 
 // Auto-focus on scan tab
 document.getElementById('sku-input').focus();
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyBX85J6hCO3a33pFi1s6WXzOk7Jnk7z86k",
+    authDomain: "bodega-pulmon-ddde9.firebaseapp.com",
+    databaseURL: "https://bodega-pulmon-ddde9-default-rtdb.firebaseio.com",
+    projectId: "bodega-pulmon-ddde9",
+    storageBucket: "bodega-pulmon-ddde9.firebasestorage.app",
+    messagingSenderId: "690737347793",
+    appId: "1:690737347793:web:642383399348a20155d9f0"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
 </script>
 </body>
 </html>
